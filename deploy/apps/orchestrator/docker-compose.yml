@@ -1,0 +1,34 @@
+# Hugo orchestrator app for a server-instance-template VPS.
+#
+# Install: copy this directory to apps/orchestrator/ in your server repo and
+# add `- apps/orchestrator/docker-compose.yml` to the root compose include
+# list. See deploy/README.md in the hugo-orchestrate repo for the one-time
+# host setup (creating /srv/static and granting Caddy read access).
+---
+services:
+  orchestrator:
+    image: ghcr.io/uppertoe/hugo-orchestrate:latest
+    restart: unless-stopped
+    user: "65532:65532"
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs: [/tmp]
+    env_file:
+      - path: ./.env
+        required: false
+    volumes:
+      # Work + output. Caddy serves /srv/static/www (see orchestrator.caddy);
+      # the host dir must be owned by uid 65532 (see README).
+      - /srv/static:/srv/static
+      - ./sites.yaml:/config/sites.yaml:ro
+    networks:
+      - caddy
+    mem_limit: 1g
+    pids_limit: 256
+
+networks:
+  caddy:
+    external: true
+    name: caddy

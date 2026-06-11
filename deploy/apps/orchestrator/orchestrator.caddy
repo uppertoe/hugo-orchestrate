@@ -1,0 +1,34 @@
+# Caddy snippet for the Hugo orchestrator (auto-appended by the scaffold).
+#
+# Caddy must be able to read the published output. The scaffold's caddy
+# service does not mount /srv/static by default — add this to a root-level
+# docker-compose.override.yml on the server:
+#
+#   services:
+#     caddy:
+#       volumes:
+#         - /srv/static/www:/srv/www:ro
+
+# Webhook intake: point each GitHub repo's webhook at
+# https://hooks.<domain>/webhook/<slug> (content type application/json).
+hooks.{$DOMAIN} {
+	@orchestrator path /webhook/* /healthz /readyz
+	handle @orchestrator {
+		reverse_proxy orchestrator:8080
+	}
+	# /status is intentionally not exposed publicly. To publish it behind the
+	# scaffold's auth app, add: handle /status { import protected
+	# reverse_proxy orchestrator:8080 }
+	respond 404
+}
+
+# One block per site: root must match the site's publish_dir in sites.yaml.
+docs.{$DOMAIN} {
+	root * /srv/www/docs
+	file_server
+}
+
+# blog.{$DOMAIN} {
+# 	root * /srv/www/blog
+# 	file_server
+# }

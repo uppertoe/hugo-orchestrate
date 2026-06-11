@@ -1,0 +1,17 @@
+# Site definitions for the Hugo orchestrator.
+# Schema reference: https://github.com/uppertoe/hugo-orchestrate
+sites:
+  - slug: docs
+    repo: https://github.com/org/docs-site.git
+    branch: main
+    publish_dir: docs            # served by Caddy at /srv/www/docs
+    hugo_env: production
+    base_url: https://docs.example.com/
+    auth:
+      token_env: DOCS_GIT_TOKEN  # omit the auth block entirely for public repos
+    build:
+      hugo_version: 0.155.3      # optional; defaults to the manifest default
+      timeout: 8m                # optional; defaults to ORCH_BUILD_TIMEOUT
+    webhook:
+      provider: github
+      secret_env: DOCS_WEBHOOK_SECRET
