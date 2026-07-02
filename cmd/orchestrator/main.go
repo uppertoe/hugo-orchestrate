@@ -6,7 +6,9 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -25,10 +27,43 @@ import (
 )
 
 func main() {
+	healthcheck := flag.Bool("healthcheck", false,
+		"probe /healthz on the configured listen port and exit 0/1 (for container healthchecks)")
+	flag.Parse()
+	if *healthcheck {
+		os.Exit(probeHealth(os.Getenv))
+	}
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, "fatal:", err)
 		os.Exit(1)
 	}
+}
+
+// probeHealth GETs /healthz over loopback on the ORCH_WEBHOOK_LISTEN port.
+// The runtime image ships no curl/wget, so the compose healthcheck re-execs
+// this binary instead.
+func probeHealth(getenv func(string) string) int {
+	listen := getenv("ORCH_WEBHOOK_LISTEN")
+	if listen == "" {
+		listen = "0.0.0.0:8080"
+	}
+	_, port, err := net.SplitHostPort(listen)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "healthcheck: invalid ORCH_WEBHOOK_LISTEN:", err)
+		return 1
+	}
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get("http://127.0.0.1:" + port + "/healthz")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "healthcheck:", err)
+		return 1
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		fmt.Fprintln(os.Stderr, "healthcheck: status", resp.Status)
+		return 1
+	}
+	return 0
 }
 
 func run() error {
@@ -95,6 +130,11 @@ func run() error {
 		Addr:              env.WebhookListen,
 		Handler:           srv.Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
+		// Bodies are capped at WebhookMaxBodyBytes; these bound how long a
+		// client may drip-feed one so slow requests can't pin goroutines.
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  2 * time.Minute,
 	}
 	httpErr := make(chan error, 1)
 	go func() {

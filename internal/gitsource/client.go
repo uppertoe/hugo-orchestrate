@@ -66,7 +66,12 @@ func (c *Client) Sync(ctx context.Context, site *config.Site, repoDir string) (s
 	}
 	// Hugo themes are commonly git submodules. The URL-scoped auth header
 	// covers same-host private submodules; cross-host private submodules are
-	// out of scope (documented).
+	// out of scope (documented). sync first: update --init reuses the URL
+	// recorded in .git/config, so an upstream .gitmodules URL change would
+	// otherwise be ignored forever.
+	if _, err := c.run(ctx, repoDir, env, redact, "submodule", "sync", "--recursive", "--quiet"); err != nil {
+		return "", err
+	}
 	if _, err := c.run(ctx, repoDir, env, redact, "submodule", "update", "--init", "--recursive"); err != nil {
 		return "", err
 	}

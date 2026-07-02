@@ -46,19 +46,29 @@ func NewWithRename(rename func(string, string) error) *Publisher {
 //
 // If the swap fails the previous live directory is restored, so a failed
 // publish never takes a site down.
+//
+// Publish is safe to retry with the same arguments: a failed swap keeps the
+// staging directory (buildDir has already been renamed away) and the retry
+// reuses it. Stale staging or previous dirs left by older builds of the same
+// site are cleared first, so one wedged cleanup can't block publishes forever.
 func (p *Publisher) Publish(buildDir, liveDir, buildID string) error {
 	if err := os.MkdirAll(filepath.Dir(liveDir), 0o755); err != nil {
 		return fmt.Errorf("create output root: %w", err)
 	}
 	staging := liveDir + stagingInfix + buildID
+	if err := removeStaleSiblings(liveDir, staging); err != nil {
+		return err
+	}
 
-	if err := p.rename(buildDir, staging); err != nil {
-		if !errors.Is(err, syscall.EXDEV) {
-			return fmt.Errorf("stage build: %w", err)
-		}
-		if err := copyTree(buildDir, staging); err != nil {
-			os.RemoveAll(staging)
-			return fmt.Errorf("stage build (cross-device copy): %w", err)
+	if _, err := os.Stat(staging); err != nil { // not already staged by a failed attempt
+		if err := p.rename(buildDir, staging); err != nil {
+			if !errors.Is(err, syscall.EXDEV) {
+				return fmt.Errorf("stage build: %w", err)
+			}
+			if err := copyTree(buildDir, staging); err != nil {
+				os.RemoveAll(staging) // a partial copy is unusable; retry re-copies from buildDir
+				return fmt.Errorf("stage build (cross-device copy): %w", err)
+			}
 		}
 	}
 
@@ -66,7 +76,6 @@ func (p *Publisher) Publish(buildDir, liveDir, buildID string) error {
 	hadLive := true
 	if err := p.rename(liveDir, prev); err != nil {
 		if !errors.Is(err, fs.ErrNotExist) {
-			os.RemoveAll(staging)
 			return fmt.Errorf("move live dir aside: %w", err)
 		}
 		hadLive = false
@@ -74,16 +83,41 @@ func (p *Publisher) Publish(buildDir, liveDir, buildID string) error {
 	if err := p.rename(staging, liveDir); err != nil {
 		if hadLive {
 			if rbErr := p.rename(prev, liveDir); rbErr != nil {
-				os.RemoveAll(staging)
 				return fmt.Errorf("activate new build: %w (ROLLBACK ALSO FAILED: %v)", err, rbErr)
 			}
 		}
-		os.RemoveAll(staging)
 		return fmt.Errorf("activate new build: %w (previous version restored)", err)
 	}
 	if hadLive {
 		if err := os.RemoveAll(prev); err != nil {
 			return fmt.Errorf("published, but failed to remove previous version %s: %w", prev, err)
+		}
+	}
+	return nil
+}
+
+// removeStaleSiblings clears leftovers from earlier publishes of this site:
+// any <liveDir>.tmp-* other than the current staging path, and a lingering
+// <liveDir>.__prev whose removal failed after a completed swap (which would
+// otherwise make every future move-aside rename fail with ENOTEMPTY).
+func removeStaleSiblings(liveDir, staging string) error {
+	dir := filepath.Dir(liveDir)
+	base := filepath.Base(liveDir)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return fmt.Errorf("read output root: %w", err)
+	}
+	for _, e := range entries {
+		name := e.Name()
+		if name != base+prevSuffix && !strings.HasPrefix(name, base+stagingInfix) {
+			continue
+		}
+		full := filepath.Join(dir, name)
+		if full == staging {
+			continue
+		}
+		if err := os.RemoveAll(full); err != nil {
+			return fmt.Errorf("remove stale publish dir %s: %w", full, err)
 		}
 	}
 	return nil

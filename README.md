@@ -103,7 +103,9 @@ Foot-gun guards, enforced at startup:
 - `POST /webhook/{slug}` — GitHub push webhooks (HMAC-SHA256 signature, body
   size limit, delivery-ID replay window, `ref`-matches-branch gate; `ping`
   returns 200, other events 202-ignored).
-- `GET /healthz` — liveness (always 200 once serving).
+- `GET /healthz` — liveness (always 200 once serving). The compose
+  healthcheck runs `orchestrator -healthcheck`, which probes this endpoint
+  over loopback (the image ships no curl/wget).
 - `GET /readyz` — 200 after the initial build pass.
 - `GET /status` — JSON summary of each site's last build. Not routed publicly
   by the example Caddy snippet.
@@ -137,6 +139,12 @@ sudo install -d -o 65532 -g 65532 /srv/static
 5. `docker compose up -d`, then point each GitHub repo's webhook at
    `https://hooks.<domain>/webhook/<slug>` (content type `application/json`,
    secret = the site's `secret_env` value).
+6. Optional: hook the published output into the template's restic backups
+   with a files-only service — `backup/services/static-sites.env` in the
+   server repo with `SERVICE_NAME=static-sites`, an empty `DB_NAME`, and
+   `BACKUP_PATHS=/srv/static/www`. Everything else under `/srv/static` (git
+   checkouts, caches, build dirs, state) is re-derivable and not worth
+   backing up.
 
 Operational notes:
 

@@ -17,8 +17,10 @@ hooks.{$DOMAIN} {
 		reverse_proxy orchestrator:8080
 	}
 	# /status is intentionally not exposed publicly. To publish it behind the
-	# scaffold's auth app, add: handle /status { import protected
-	# reverse_proxy orchestrator:8080 }
+	# scaffold's auth app, add a "handle /status" block whose body is
+	# "import protected orchestrator:8080". NOTE: keep comments in .caddy
+	# files free of braces -- the scaffold's run-caddy.sh counts braces when
+	# assembling the Caddyfile.
 	respond 404
 }
 

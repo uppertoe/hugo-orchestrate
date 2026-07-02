@@ -110,9 +110,64 @@ func TestPublishRollbackRestoresPrevious(t *testing.T) {
 	if got := readLive(t, live); got != "v1" {
 		t.Errorf("previous version not restored, live = %q", got)
 	}
+	if _, err := os.Stat(live + ".tmp-b2"); err != nil {
+		t.Errorf("staging must survive a rolled-back swap so a retry can reuse it: %v", err)
+	}
+
+	// The build dir was renamed into staging by the failed attempt; a retry
+	// with the same arguments must reuse the staging dir and succeed.
+	if err := p.Publish(filepath.Join(root, "b2"), live, "b2"); err != nil {
+		t.Fatalf("retry after rolled-back swap: %v", err)
+	}
+	if got := readLive(t, live); got != "v2" {
+		t.Errorf("retry did not activate the staged build, live = %q", got)
+	}
 	entries, _ := os.ReadDir(filepath.Join(root, "out"))
 	if len(entries) != 1 {
-		t.Errorf("rollback left debris: %v", entries)
+		t.Errorf("successful retry left debris: %v", entries)
+	}
+}
+
+func TestPublishClearsStaleSiblings(t *testing.T) {
+	root := t.TempDir()
+	live := filepath.Join(root, "out", "docs")
+	p := New()
+	if err := p.Publish(mkBuild(t, root, "b1", "v1"), live, "b1"); err != nil {
+		t.Fatal(err)
+	}
+
+	// A wedged earlier publish left a previous-version dir and an old staging
+	// dir behind. Both must be cleared, or the move-aside rename fails with
+	// ENOTEMPTY on every future publish.
+	for _, d := range []string{live + ".__prev", live + ".tmp-old"} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(d, "junk.html"), []byte("junk"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := p.Publish(mkBuild(t, root, "b2", "v2"), live, "b2"); err != nil {
+		t.Fatal(err)
+	}
+	if got := readLive(t, live); got != "v2" {
+		t.Errorf("live = %q", got)
+	}
+	entries, _ := os.ReadDir(filepath.Join(root, "out"))
+	if len(entries) != 1 {
+		t.Errorf("stale siblings not cleared: %v", entries)
+	}
+	// Similarly-prefixed sibling sites must never be swept.
+	other := filepath.Join(root, "out", "docs2")
+	if err := p.Publish(mkBuild(t, root, "b3", "other"), other, "b3"); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.Publish(mkBuild(t, root, "b4", "v3"), live, "b4"); err != nil {
+		t.Fatal(err)
+	}
+	if got := readLive(t, other); got != "other" {
+		t.Errorf("sibling site clobbered, live = %q", got)
 	}
 }
 

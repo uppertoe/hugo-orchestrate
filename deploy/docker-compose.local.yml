@@ -12,6 +12,7 @@ services:
       context: ..
       dockerfile: deploy/Dockerfile
     restart: unless-stopped
+    init: true
     user: "65532:65532"
     cap_drop: [ALL]
     security_opt:
@@ -26,6 +27,12 @@ services:
       - ./apps/orchestrator/sites.yaml:/config/sites.yaml:ro
     ports:
       - "8080:8080"
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/orchestrator", "-healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   caddy:
     image: caddy:2-alpine

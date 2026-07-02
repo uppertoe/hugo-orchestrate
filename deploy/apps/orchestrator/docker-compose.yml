@@ -7,14 +7,18 @@
 ---
 services:
   orchestrator:
+    # Pin by digest in your server repo (Renovate's pinDigests does this).
     image: ghcr.io/uppertoe/hugo-orchestrate:latest
     restart: unless-stopped
+    init: true  # reap grandchildren orphaned by the git/hugo subprocesses
     user: "65532:65532"
     cap_drop: [ALL]
     security_opt:
       - no-new-privileges:true
     read_only: true
     tmpfs: [/tmp]
+    environment:
+      - TZ=UTC
     env_file:
       - path: ./.env
         required: false
@@ -27,6 +31,15 @@ services:
       - caddy
     mem_limit: 1g
     pids_limit: 256
+    healthcheck:
+      # The image ships no curl/wget; the binary probes its own /healthz.
+      test: ["CMD", "/usr/local/bin/orchestrator", "-healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
 
 networks:
   caddy:
