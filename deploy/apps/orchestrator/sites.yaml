@@ -1,14 +1,19 @@
 # Site definitions for the Hugo orchestrator.
 # Schema reference: https://github.com/uppertoe/hugo-orchestrate
+#
+# Changes here are picked up on container restart only:
+#   docker compose restart orchestrator
 sites:
   - slug: docs
     repo: https://github.com/org/docs-site.git
     branch: main
     publish_dir: docs            # served by Caddy at /srv/www/docs
     hugo_env: production
-    base_url: https://docs.example.com/
+    base_url: https://docs.example.com/  # optional; omit to use the site's own hugo config
     auth:
-      token_env: DOCS_GIT_TOKEN  # omit the auth block entirely for public repos
+      # Omit the auth block entirely for public repos. Several sites may
+      # share one token_env (e.g. a classic PAT covering all site repos).
+      token_env: DOCS_GIT_TOKEN
     build:
       hugo_version: 0.155.3      # optional; defaults to the manifest default
       timeout: 8m                # optional; defaults to ORCH_BUILD_TIMEOUT
