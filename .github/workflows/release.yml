@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
     tags: ["v*"]
+  schedule:
+    # Weekly rebuild so base-image and Go toolchain security fixes are picked
+    # up even when no code changes; the digest pin on the server repo follows.
+    - cron: "20 17 * * 0" # Sun 17:20 UTC (Mon 03:20 AEST)
+  workflow_dispatch:
 
 permissions:
   contents: read
