@@ -1,5 +1,5 @@
 # Hugo versions baked into the image (extended flavor).
 # First non-comment line is the default; remaining lines are additional
 # allowed versions selectable per site via build.hugo_version.
-0.163.0
+0.163.3
 0.155.3
