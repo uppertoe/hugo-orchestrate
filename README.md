@@ -112,39 +112,38 @@ Foot-gun guards, enforced at startup:
 
 ## Deploying on server-instance-template
 
-One-time host setup (as the deploy user):
-
-```bash
-sudo install -d -o 65532 -g 65532 /srv/static
-```
+The bundled app is self-provisioning: published output and build scratch live
+on named volumes (`orchestrator_www` / `orchestrator_work`) that a one-shot
+init container chowns to 65532 on first start, and every site builds once at
+container start — there are no host directories to prepare, and a rebuilt
+server repopulates itself. (If you bind-mount a host directory over
+`/srv/static` instead, chown it `65532:65532` yourself.)
 
 1. Copy `deploy/apps/orchestrator/` into your server repo as
-   `apps/orchestrator/` and add `- apps/orchestrator/docker-compose.yml` to
-   the root `docker-compose.yml` include list.
+   `apps/orchestrator/`, add `- apps/orchestrator/docker-compose.yml` to the
+   root `docker-compose.yml` include list, then re-render the committed Caddy
+   bundle: `bash scaffold/docker/render-caddy-routes.sh && git add .generated`.
+   Caddy's read access to the output is already wired: the app compose
+   carries a partial `caddy:` stanza mounting `orchestrator_www` read-only at
+   `/srv/www`, which Compose include-merges into the scaffold's base — the
+   same mechanism as the generated `networks.yml`. Don't add a `networks:`
+   block; the renderer generates a private `orchestrator_proxy` network.
 2. Edit `apps/orchestrator/sites.yaml` with your sites, and
    `apps/orchestrator/orchestrator.caddy` with one `file_server` block per
-   `publish_dir` (subdomains of `{$DOMAIN}`).
-3. Give the scaffold's Caddy read access to the output — root-level
-   `docker-compose.override.yml` on the server:
+   `publish_dir`, rooted at `/srv/www/<publish_dir>`.
+3. On the server, `cp apps/orchestrator/.env.example apps/orchestrator/.env`
+   and fill in the repo tokens and webhook secrets (the scaffold's `./deploy`
+   enforces mode 600). Do this **before** deploying: a `token_env` that
+   resolves empty is a hard startup error, and `./deploy` waits for services
+   to become healthy.
+4. Deploy (`./deploy`, or `docker compose up -d`), then point each GitHub
+   repo's webhook at `https://hooks.<domain>/webhook/<slug>` (content type
+   `application/json`, secret = the site's `secret_env` value). `/readyz`
+   returns 200 once the first build pass has published every site.
 
-   ```yaml
-   services:
-     caddy:
-       volumes:
-         - /srv/static/www:/srv/www:ro
-   ```
-
-4. `cp apps/orchestrator/.env.example apps/orchestrator/.env`, fill in the
-   repo tokens and webhook secrets, `chmod 600`.
-5. `docker compose up -d`, then point each GitHub repo's webhook at
-   `https://hooks.<domain>/webhook/<slug>` (content type `application/json`,
-   secret = the site's `secret_env` value).
-6. Optional: hook the published output into the template's restic backups
-   with a files-only service — `backup/services/static-sites.env` in the
-   server repo with `SERVICE_NAME=static-sites`, an empty `DB_NAME`, and
-   `BACKUP_PATHS=/srv/static/www`. Everything else under `/srv/static` (git
-   checkouts, caches, build dirs, state) is re-derivable and not worth
-   backing up.
+Backups: everything on both volumes is re-derivable — sites rebuild from
+their source repos at startup and on the next push — so this app needs no
+entry in the template's restic backup set.
 
 Operational notes:
 
@@ -153,11 +152,12 @@ Operational notes:
   enforces this at startup.
 - The container runs non-root (65532), read-only rootfs, all capabilities
   dropped. Build scratch (git checkouts, Hugo caches) lives on the work
-  volume — tmpfs `/tmp` alone is not sufficient, which is why `/srv/static`
-  is a real mount.
+  volume — tmpfs `/tmp` alone is not sufficient — and the reverse proxy
+  mounts only the output volume, never checkouts or build scratch.
 - Published files are world-readable (Hugo defaults), so the separate Caddy
   container can serve them under a different uid.
-- Config changes (sites.yaml, env) are picked up on container restart only.
+- Config changes are picked up on container restart only; `.env` changes
+  additionally need a recreate (`docker compose up -d`), not just a restart.
 
 ## Local development
 

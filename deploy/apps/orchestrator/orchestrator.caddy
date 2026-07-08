@@ -1,13 +1,13 @@
-# Caddy snippet for the Hugo orchestrator (auto-appended by the scaffold).
+# Caddy snippet for the Hugo orchestrator (bundled by the scaffold's
+# renderer, which also injects compression, access logs and baseline
+# security headers into every site block).
 #
-# Caddy must be able to read the published output. The scaffold's caddy
-# service does not mount /srv/static by default — add this to a root-level
-# docker-compose.override.yml on the server:
+# Caddy reads the published output from the orchestrator_www volume, mounted
+# read-only at /srv/www by the partial caddy stanza in this app's
+# docker-compose.yml -- no root-level override file is needed.
 #
-#   services:
-#     caddy:
-#       volumes:
-#         - /srv/static/www:/srv/www:ro
+# NOTE: keep comments in .caddy files free of braces -- the renderer counts
+# braces when assembling the Caddyfile bundle.
 
 # Webhook intake: point each GitHub repo's webhook at
 # https://hooks.<domain>/webhook/<slug> (content type application/json).
@@ -16,21 +16,19 @@ hooks.{$DOMAIN} {
 	handle @orchestrator {
 		reverse_proxy orchestrator:8080
 	}
-	# /status is intentionally not exposed publicly. To publish it behind the
-	# scaffold's auth app, add a "handle /status" block whose body is
-	# "import protected orchestrator:8080". NOTE: keep comments in .caddy
-	# files free of braces -- the scaffold's run-caddy.sh counts braces when
-	# assembling the Caddyfile.
+	# /status (per-site last-build JSON) is intentionally not public. To
+	# publish it behind the scaffold's auth gateway, add above the matcher a
+	# "handle /status" block whose body is "import protected orchestrator:8080"
+	# (or one of the other guard snippets from apps/auth/auth.caddy).
 	respond 404
 }
 
 # One block per site: root must match the site's publish_dir in sites.yaml.
+# Any site address works -- a subdomain as below, or the bare DOMAIN
+# placeholder as the address to serve a site at the apex. Copy this block for
+# each additional site; commented-out blocks are NOT safe here, because their
+# braces still count toward the renderer's balance.
 docs.{$DOMAIN} {
 	root * /srv/www/docs
 	file_server
 }
-
-# blog.{$DOMAIN} {
-# 	root * /srv/www/blog
-# 	file_server
-# }

@@ -1,16 +1,61 @@
 # Hugo orchestrator app for a server-instance-template VPS.
 #
-# Install: copy this directory to apps/orchestrator/ in your server repo and
-# add `- apps/orchestrator/docker-compose.yml` to the root compose include
-# list. See deploy/README.md in the hugo-orchestrate repo for the one-time
-# host setup (creating /srv/static and granting Caddy read access).
+# Install: copy this directory to apps/orchestrator/ in your server repo, add
+# `- apps/orchestrator/docker-compose.yml` to the root compose include list,
+# then re-render the committed Caddy bundle:
+#   bash scaffold/docker/render-caddy-routes.sh && git add .generated
+# See "Deploying on server-instance-template" in the repo README.
+#
+# Self-provisioning: no host directories to prepare. Published output and
+# build scratch live on named volumes, and every site builds once at
+# container start, so a rebuilt server repopulates itself.
 ---
 services:
+  # One-shot volume initialiser: fresh named volumes are created root-owned,
+  # and the hardened orchestrator below runs as 65532. The image pre-creates
+  # /srv/static with the right owner, but the two volume mountpoints inside
+  # it start empty and root-owned. Same pattern as the scaffold's caddy-init.
+  #
+  # Also normalises sites.yaml to 644: the template's host hardening sets a
+  # restrictive login umask, so files created by git pull land 660 and are
+  # unreadable to uid 65532 (Caddy dodges this only because it runs as the
+  # deploy user's uid). Conditional chmod, so ctime is bumped — and AIDE
+  # noise generated — only when the mode actually drifts.
+  orchestrator-init:
+    # Pin by digest in your server repo (Renovate's pinDigests does this).
+    image: ghcr.io/uppertoe/hugo-orchestrate:latest
+    restart: "no"
+    user: "0:0"
+    cap_drop: [ALL]
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER        # chmod a file owned by the deploy user, not root
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    mem_limit: 64m
+    pids_limit: 32
+    network_mode: none
+    entrypoint: ["/bin/sh", "-c", "chown -R 65532:65532 /srv/static/www /srv/static/work && find /config/sites.yaml ! -perm 644 -exec chmod 644 {} +"]
+    volumes:
+      - orchestrator_www:/srv/static/www
+      - orchestrator_work:/srv/static/work
+      - ./sites.yaml:/config/sites.yaml
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+      - "vps-scaffold.audit=init-volume-owner"
+
   orchestrator:
     # Pin by digest in your server repo (Renovate's pinDigests does this).
     image: ghcr.io/uppertoe/hugo-orchestrate:latest
+    depends_on:
+      orchestrator-init:
+        condition: service_completed_successfully
     restart: unless-stopped
     init: true  # reap grandchildren orphaned by the git/hugo subprocesses
+    # CIS Docker §5 runtime hardening. Build scratch (git checkouts, Hugo
+    # caches) lives on the work volume — tmpfs /tmp alone is not enough.
     user: "65532:65532"
     cap_drop: [ALL]
     security_opt:
@@ -21,14 +66,18 @@ services:
       - TZ=UTC
     env_file:
       - path: ./.env
-        required: false
+        required: false  # keep `docker compose config` valid in CI without a real .env
     volumes:
-      # Work + output. Caddy serves /srv/static/www (see orchestrator.caddy);
-      # the host dir must be owned by uid 65532 (see README).
-      - /srv/static:/srv/static
+      # Split volumes so the reverse proxy sees only published output, never
+      # the git checkouts / build scratch (defaults: ORCH_OUTPUT_ROOT=
+      # /srv/static/www, ORCH_WORK_ROOT=/srv/static/work). Atomic publish
+      # stages on the destination filesystem, so the split is safe.
+      - orchestrator_www:/srv/static/www
+      - orchestrator_work:/srv/static/work
       - ./sites.yaml:/config/sites.yaml:ro
-    networks:
-      - caddy
+    # No networks block: the scaffold's renderer wires a private
+    # orchestrator_proxy network shared only with Caddy
+    # (.generated/caddy/networks.yml).
     mem_limit: 1g
     pids_limit: 256
     healthcheck:
@@ -41,7 +90,14 @@ services:
     labels:
       - "com.centurylinklabs.watchtower.enable=false"
 
-networks:
+  # Grant the scaffold's Caddy read access to the published output: compose
+  # include-merges this partial stanza into the scaffold's caddy.base.yml,
+  # the same mechanism as the generated networks.yml. Root paths in
+  # orchestrator.caddy are /srv/www/<publish_dir>.
   caddy:
-    external: true
-    name: caddy
+    volumes:
+      - orchestrator_www:/srv/www:ro
+
+volumes:
+  orchestrator_www:
+  orchestrator_work:
