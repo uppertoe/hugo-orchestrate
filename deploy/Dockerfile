@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Stage 1: static orchestrator binary (cross-compiled on the build platform).
-FROM --platform=$BUILDPLATFORM golang:1.25-bookworm AS build
+FROM --platform=$BUILDPLATFORM golang:1.26-bookworm AS build
 ARG TARGETOS
 ARG TARGETARCH
 WORKDIR /src
@@ -14,7 +14,7 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
 # Stage 2: download + sha256-verify the Hugo versions in the manifest.
 # Runs on the build platform but fetches TARGETARCH tarballs, so multi-arch
 # builds stay fast under emulation-free cross builds.
-FROM --platform=$BUILDPLATFORM golang:1.25-bookworm AS hugo-installer
+FROM --platform=$BUILDPLATFORM golang:1.26-bookworm AS hugo-installer
 ARG TARGETARCH
 WORKDIR /src
 COPY go.mod ./
