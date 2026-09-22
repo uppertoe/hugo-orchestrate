@@ -20,6 +20,7 @@ type Env struct {
 	WebhookListen       string
 	LogLevel            string
 	MaxConcurrentBuilds int
+	HugoMemoryLimit     string
 	BuildTimeout        time.Duration
 	GitTimeout          time.Duration
 	OperationRetries    int
@@ -61,9 +62,17 @@ func LoadEnv(getenv Getenv) (*Env, error) {
 	e.LogLevel = stringVar(getenv, "ORCH_LOG_LEVEL", "info")
 	e.HugoManifestPath = stringVar(getenv, "ORCH_HUGO_MANIFEST_PATH", "/etc/orchestrator/hugo-manifest.txt")
 	e.HugoBinRoot = stringVar(getenv, "ORCH_HUGO_BIN_ROOT", "/opt/hugo")
+	// Optional soft memory ceiling handed to the hugo subprocess as GOMEMLIMIT
+	// (hugo is a Go program): under pressure it collects harder instead of
+	// growing until the host suffers. Empty leaves hugo unconstrained.
+	e.HugoMemoryLimit = stringVar(getenv, "ORCH_HUGO_MEMORY_LIMIT", "")
 
 	var err error
-	if e.MaxConcurrentBuilds, err = intVar(getenv, "ORCH_MAX_CONCURRENT_BUILDS", 2, 1); err != nil {
+	// Default 1: the target is a small single-vCPU VPS, where two Hugo builds
+	// running together (every site is enqueued at startup) can exhaust host
+	// memory before any per-container limit bites. Raise it where there is
+	// headroom to spare.
+	if e.MaxConcurrentBuilds, err = intVar(getenv, "ORCH_MAX_CONCURRENT_BUILDS", 1, 1); err != nil {
 		return nil, err
 	}
 	if e.OperationRetries, err = intVar(getenv, "ORCH_OPERATION_RETRIES", 2, 0); err != nil {

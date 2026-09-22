@@ -46,7 +46,7 @@ func New(env *config.Env, sites []*config.Site, catalog *hugo.Catalog, states *s
 		sites:     make(map[string]*config.Site, len(sites)),
 		catalog:   catalog,
 		git:       gitsource.New(env.GitTimeout, layout.HomeDir()),
-		runner:    &build.Runner{HomeDir: layout.HomeDir()},
+		runner:    &build.Runner{HomeDir: layout.HomeDir(), MemoryLimit: env.HugoMemoryLimit},
 		pub:       publish.New(),
 		states:    states,
 		log:       log,

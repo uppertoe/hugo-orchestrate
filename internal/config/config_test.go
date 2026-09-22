@@ -18,7 +18,7 @@ func TestLoadEnvDefaults(t *testing.T) {
 	if e.StaticRoot != "/srv/static" || e.OutputRoot != "/srv/static/www" || e.WorkRoot != "/srv/static/work" {
 		t.Errorf("unexpected roots: %+v", e)
 	}
-	if e.MaxConcurrentBuilds != 2 || e.BuildTimeout != 10*time.Minute || e.GitTimeout != 2*time.Minute {
+	if e.MaxConcurrentBuilds != 1 || e.BuildTimeout != 10*time.Minute || e.GitTimeout != 2*time.Minute {
 		t.Errorf("unexpected defaults: %+v", e)
 	}
 	if e.WebhookMaxBodyBytes != 262144 || e.WebhookReplayWindow != 10*time.Minute {

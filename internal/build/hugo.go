@@ -17,6 +17,11 @@ const outputTailBytes = 4096
 // Runner executes hugo builds.
 type Runner struct {
 	HomeDir string // writable HOME under the work volume (read-only rootfs)
+	// MemoryLimit, when set, is passed to hugo as GOMEMLIMIT. Hugo is a Go
+	// program, so this is a soft ceiling: it collects more aggressively as it
+	// approaches the limit rather than being killed at it. On a small host
+	// that is the difference between a slow build and an exhausted machine.
+	MemoryLimit string
 }
 
 // Input describes one hugo invocation.
@@ -63,6 +68,9 @@ func (r *Runner) Run(ctx context.Context, in Input) error {
 		"HOME=" + r.HomeDir,
 		"XDG_CACHE_HOME=" + in.CacheDir,
 		"HUGO_ENVIRONMENT=" + in.Environment,
+	}
+	if r.MemoryLimit != "" {
+		cmd.Env = append(cmd.Env, "GOMEMLIMIT="+r.MemoryLimit)
 	}
 	out, err := cmd.CombinedOutput()
 	if err != nil {

@@ -58,7 +58,7 @@ Durations use Go syntax (`90s`, `10m`, `1h`).
 | `ORCH_SITES_CONFIG` | `/config/sites.yaml` | Site definitions. |
 | `ORCH_WEBHOOK_LISTEN` | `0.0.0.0:8080` | HTTP bind address. |
 | `ORCH_LOG_LEVEL` | `info` | `debug`/`info`/`warn`/`error` (JSON via `log/slog`). |
-| `ORCH_MAX_CONCURRENT_BUILDS` | `2` | Global build cap. |
+| `ORCH_MAX_CONCURRENT_BUILDS` | `1` | Global build cap. Every site is built at startup, so raising this runs that many Hugo builds at once; on a small VPS that is the main memory risk. |
 | `ORCH_BUILD_TIMEOUT` | `10m` | Per-build wall clock. |
 | `ORCH_GIT_TIMEOUT` | `2m` | Per git operation. |
 | `ORCH_OPERATION_RETRIES` | `2` | Retries (git sync, publish) with exponential backoff. |
@@ -69,6 +69,7 @@ Durations use Go syntax (`90s`, `10m`, `1h`).
 | `ORCH_WEBHOOK_REPLAY_WINDOW` | `10m` | Delivery-ID dedupe window (in-memory; restart clears it). |
 | `ORCH_HUGO_MANIFEST_PATH` | `/etc/orchestrator/hugo-manifest.txt` | Installed-version source of truth. |
 | `ORCH_HUGO_BIN_ROOT` | `/opt/hugo` | `<root>/<version>/hugo`. |
+| `ORCH_HUGO_MEMORY_LIMIT` | _(unset)_ | Soft heap ceiling for the Hugo subprocess, passed as `GOMEMLIMIT` (e.g. `768MiB`). Hugo collects harder near the limit rather than being killed at it. |
 
 ### `sites.yaml`
 
