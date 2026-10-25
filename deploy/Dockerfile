@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Stage 1: static orchestrator binary (cross-compiled on the build platform).
-FROM --platform=$BUILDPLATFORM golang:1.25-bookworm AS build
+FROM --platform=$BUILDPLATFORM golang:1.27-bookworm AS build
 ARG TARGETOS
 ARG TARGETARCH
 WORKDIR /src
@@ -14,7 +14,7 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
 # Stage 2: download + sha256-verify the Hugo versions in the manifest.
 # Runs on the build platform but fetches TARGETARCH tarballs, so multi-arch
 # builds stay fast under emulation-free cross builds.
-FROM --platform=$BUILDPLATFORM golang:1.25-bookworm AS hugo-installer
+FROM --platform=$BUILDPLATFORM golang:1.27-bookworm AS hugo-installer
 ARG TARGETARCH
 WORKDIR /src
 COPY go.mod ./
@@ -29,7 +29,10 @@ RUN go run ./deploy/install-hugo \
 # binary (Hugo themes are commonly git submodules), and hugo_extended is
 # dynamically linked against libstdc++.
 FROM debian:bookworm-slim
+# apt-get upgrade picks up Debian security fixes published after the
+# bookworm-slim tag was last rebuilt.
 RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
     && apt-get install -y --no-install-recommends git ca-certificates libstdc++6 \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd -g 65532 orchestrator \
