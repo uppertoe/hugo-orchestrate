@@ -72,7 +72,7 @@ func (c *Client) Sync(ctx context.Context, site *config.Site, repoDir string) (s
 	if _, err := c.run(ctx, repoDir, env, redact, "submodule", "sync", "--recursive", "--quiet"); err != nil {
 		return "", err
 	}
-	if _, err := c.run(ctx, repoDir, env, redact, "submodule", "update", "--init", "--recursive"); err != nil {
+	if _, err := c.run(ctx, repoDir, env, redact, submoduleUpdateArgs(site)...); err != nil {
 		return "", err
 	}
 	out, err := c.run(ctx, repoDir, env, redact, "rev-parse", "HEAD")
@@ -80,6 +80,17 @@ func (c *Client) Sync(ctx context.Context, site *config.Site, repoDir string) (s
 		return "", err
 	}
 	return strings.TrimSpace(out), nil
+}
+
+// submoduleUpdateArgs returns the git arguments that check out the site's
+// submodules: at the recorded commit by default, or at the tip of each
+// submodule's tracking branch when build.submodules_remote is set.
+func submoduleUpdateArgs(site *config.Site) []string {
+	args := []string{"submodule", "update", "--init", "--recursive"}
+	if site.Build.SubmodulesRemote {
+		args = append(args, "--remote")
+	}
+	return args
 }
 
 // gitEnv builds the minimal environment for git: writable HOME, no global or
