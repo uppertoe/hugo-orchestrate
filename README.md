@@ -44,6 +44,16 @@ GitHub push ──▶ POST /webhook/{slug} ──▶ coalescing queue ──▶ 
   Cross-host *private* submodules also need credential handling that v1
   doesn't provide (same-host private submodules work).
 
+### Sites that gather content from other repos
+
+A site can pull content from other repos as git submodules and mount them
+with Hugo's `module.mounts` (local mounts need no `go` toolchain). With
+`build.submodules_remote: true`, each build checks the submodules out at the
+tip of their tracking branch (`git submodule update --remote`), so a push to
+a content repo reaches the site without bumping the pointer in the site repo.
+Point the content repo's webhook at the site's `/webhook/<slug>` with the
+site's secret; the push must be to the branch named in `sites.yaml`.
+
 ## Configuration
 
 ### Environment (`ORCH_*`)
@@ -86,6 +96,7 @@ sites:
     build:
       hugo_version: 0.155.3          # default: manifest's first line
       timeout: 8m                    # default: ORCH_BUILD_TIMEOUT
+      submodules_remote: false       # true: submodules follow their branch tip
     webhook:
       provider: github               # only value
       secret_env: DOCS_WEBHOOK_SECRET

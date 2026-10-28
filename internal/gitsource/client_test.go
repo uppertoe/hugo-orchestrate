@@ -63,3 +63,14 @@ func TestGitEnvAnonymous(t *testing.T) {
 		t.Error("anonymous site must not get auth config")
 	}
 }
+
+func TestSubmoduleUpdateArgs(t *testing.T) {
+	pinned := &config.Site{}
+	if got := strings.Join(submoduleUpdateArgs(pinned), " "); got != "submodule update --init --recursive" {
+		t.Fatalf("pinned: got %q", got)
+	}
+	remote := &config.Site{Build: config.BuildSpec{SubmodulesRemote: true}}
+	if got := strings.Join(submoduleUpdateArgs(remote), " "); got != "submodule update --init --recursive --remote" {
+		t.Fatalf("remote: got %q", got)
+	}
+}

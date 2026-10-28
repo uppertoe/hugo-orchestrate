@@ -63,6 +63,11 @@ type AuthSpec struct {
 type BuildSpec struct {
 	HugoVersion string   `yaml:"hugo_version"`
 	Timeout     Duration `yaml:"timeout"`
+	// SubmodulesRemote checks each submodule out at the tip of its tracking
+	// branch (git submodule update --remote) instead of the commit the site
+	// repo records, so a site that gathers content from other repos picks up
+	// their latest push without a pointer bump in the site repo.
+	SubmodulesRemote bool `yaml:"submodules_remote"`
 }
 
 // WebhookSpec configures the GitHub webhook for a site.
