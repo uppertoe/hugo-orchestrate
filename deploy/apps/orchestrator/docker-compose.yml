@@ -23,7 +23,7 @@ services:
   # noise generated — only when the mode actually drifts.
   orchestrator-init:
     # Pin by digest in your server repo (Renovate's pinDigests does this).
-    image: ghcr.io/uppertoe/hugo-orchestrate:latest@sha256:a2b1fe5e8618e1d7c065d42370961922164a85e5eaac91b7ebdb9f5c6120da0c
+    image: ghcr.io/uppertoe/hugo-orchestrate:latest@sha256:3c1c0f4dd0b7e0dcd0dc7ff4e32421b617b856ad419ad3bfb546fcd1b0aae7e1
     restart: "no"
     user: "0:0"
     cap_drop: [ALL]
@@ -48,7 +48,7 @@ services:
 
   orchestrator:
     # Pin by digest in your server repo (Renovate's pinDigests does this).
-    image: ghcr.io/uppertoe/hugo-orchestrate:latest@sha256:a2b1fe5e8618e1d7c065d42370961922164a85e5eaac91b7ebdb9f5c6120da0c
+    image: ghcr.io/uppertoe/hugo-orchestrate:latest@sha256:3c1c0f4dd0b7e0dcd0dc7ff4e32421b617b856ad419ad3bfb546fcd1b0aae7e1
     depends_on:
       orchestrator-init:
         condition: service_completed_successfully
