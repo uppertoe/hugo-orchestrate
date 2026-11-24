@@ -28,7 +28,7 @@ RUN go run ./deploy/install-hugo \
 # Stage 3: runtime. Not distroless/static: we shell out to the real git
 # binary (Hugo themes are commonly git submodules), and hugo_extended is
 # dynamically linked against libstdc++.
-FROM debian:bookworm-slim@sha256:99c0b25c46d0214d5a2091092e7908907dcaecd6a962cde0ac700acee222b6f3
+FROM debian:bookworm-slim@sha256:e67eeead736ff7bbe258ef088bff683635c561b1fcfefad0806c1df4ab49ce0e
 # apt-get upgrade picks up Debian security fixes published after the
 # bookworm-slim tag was last rebuilt.
 RUN apt-get update \
