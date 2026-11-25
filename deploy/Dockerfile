@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
 
 # Stage 1: static orchestrator binary (cross-compiled on the build platform).
-FROM --platform=$BUILDPLATFORM golang:1.27-bookworm@sha256:d9b6a1beb9474adc2a1ce842573639b44b2a0dd49b6669f51d3821baf9ec37c9 AS build
+FROM --platform=$BUILDPLATFORM golang:1.27-bookworm@sha256:ce59b41415e2524ae99926fe1f37ce48ba8c194dcbd2a56a65436cdcefa2bd34 AS build
 ARG TARGETOS
 ARG TARGETARCH
 WORKDIR /src
@@ -14,7 +14,7 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
 # Stage 2: download + sha256-verify the Hugo versions in the manifest.
 # Runs on the build platform but fetches TARGETARCH tarballs, so multi-arch
 # builds stay fast under emulation-free cross builds.
-FROM --platform=$BUILDPLATFORM golang:1.27-bookworm@sha256:d9b6a1beb9474adc2a1ce842573639b44b2a0dd49b6669f51d3821baf9ec37c9 AS hugo-installer
+FROM --platform=$BUILDPLATFORM golang:1.27-bookworm@sha256:ce59b41415e2524ae99926fe1f37ce48ba8c194dcbd2a56a65436cdcefa2bd34 AS hugo-installer
 ARG TARGETARCH
 WORKDIR /src
 COPY go.mod ./
